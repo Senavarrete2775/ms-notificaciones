@@ -1,0 +1,31 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: ms-notificaciones
+
+  # Configuración de Conexión a RabbitMQ
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        acknowledge-mode: manual  # Manejo manual de ACK/NACK (Indicador 5 - 20%)
+        prefetch: 1
+        default-requeue-rejected: false
+
+# ==============================================================================
+# CONFIGURACIÓN CENTRALIZADA DE MENSAJERÍA RABBITMQ (INDICADOR 1 - 100%)
+# ==============================================================================
+app:
+  rabbitmq:
+    exchange: pedidos.exchange
+    routing-key: pedidos.creado.key
+    queue: pedidos.notificacion.queue
+    # Configuración de Dead Letter Queue (DLQ)
+    dlx: pedidos.dlx
+    dlq-routing-key: pedidos.dlq.key
+    dlq: pedidos.dlq
