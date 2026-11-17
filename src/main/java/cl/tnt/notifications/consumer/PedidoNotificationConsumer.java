@@ -27,7 +27,7 @@ public class PedidoNotificationConsumer {
     private static final Logger log = LoggerFactory.getLogger(PedidoNotificationConsumer.class);
 
     @RabbitListener(
-            queues = "${app.rabbitmq.queue}",
+            queues = "${app.rabbitmq.queues.notificacion}",
             containerFactory = "rabbitListenerContainerFactory"
     )
     public void procesarNotificacionPedido(
