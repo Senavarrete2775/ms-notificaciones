@@ -26,7 +26,7 @@ public class TicketGenerationConsumer {
     private static final Logger log = LoggerFactory.getLogger(TicketGenerationConsumer.class);
 
     @RabbitListener(
-            queues = "${app.rabbitmq.queue}",
+            queues = "${app.rabbitmq.queues.ticket}",
             containerFactory = "rabbitListenerContainerFactory"
     )
     public void procesarGeneracionTicket(
@@ -37,8 +37,9 @@ public class TicketGenerationConsumer {
 
         log.info("[DOMINIO: TICKETS Y DOCUMENTOS] Iniciando emisión de comprobante digital...");
         try {
-            if (evento == null || evento.getId() == null) {
-                log.warn("[TICKETS] Evento inválido. Descartando con basicNack.");
+            if (evento == null || evento.getId() == null
+                    || evento.getMonto() == null || evento.getMonto() <= 0) {
+                log.warn("[TICKETS] Evento inválido (sin id o monto <= 0). Rechazando a DLQ con basicNack: {}", evento);
                 channel.basicNack(deliveryTag, false, false);
                 return;
             }

@@ -5,27 +5,67 @@ spring:
   application:
     name: ms-notificaciones
 
-  # Configuración de Conexión a RabbitMQ
   rabbitmq:
+    # Clúster: si cae un nodo, el cliente se conecta al otro
+    addresses: ${RABBITMQ_ADDRESSES:localhost:5672,localhost:5673}
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
     listener:
       simple:
-        acknowledge-mode: manual  # Manejo manual de ACK/NACK (Indicador 5 - 20%)
+        acknowledge-mode: manual
         prefetch: 1
         default-requeue-rejected: false
 
-# ==============================================================================
-# CONFIGURACIÓN CENTRALIZADA DE MENSAJERÍA RABBITMQ (INDICADOR 1 - 100%)
-# ==============================================================================
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092,localhost:9093,localhost:9094}
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false          # el commit lo hace el contenedor tras procesar cada registro
+      max-poll-records: 50
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.value.default.type: cl.tnt.notifications.dto.PedidoEventDTO
+        spring.json.use.type.headers: false
+        spring.json.trusted.packages: cl.tnt.notifications.dto
+        session.timeout.ms: 30000
+        heartbeat.interval.ms: 10000
+    listener:
+      ack-mode: record
+      concurrency: 3                     # 3 hilos por listener = 1 por partición
+
 app:
   rabbitmq:
-    exchange: pedidos.exchange
-    routing-key: pedidos.creado.key
-    queue: pedidos.notificacion.queue
-    # Configuración de Dead Letter Queue (DLQ)
-    dlx: pedidos.dlx
-    dlq-routing-key: pedidos.dlq.key
-    dlq: pedidos.dlq
+    exchanges:
+      pedidos: pedidos.exchange          # topic
+      tickets: tickets.exchange          # direct
+      dlx: pedidos.dlx                   # direct (Dead Letter Exchange)
+    queues:
+      notificacion: pedidos.notificacion.queue
+      ticket: pedidos.ticket.queue
+      auditoria: pedidos.auditoria.queue
+    dlqs:
+      notificacion: pedidos.notificacion.dlq
+      ticket: pedidos.ticket.dlq
+      auditoria: pedidos.auditoria.dlq
+    routing-keys:
+      pedido-creado: pedidos.creado.key
+      ticket: ticket.generar
+      auditoria: pedidos.#
+      dlq-notificacion: dlq.notificacion
+      dlq-ticket: dlq.ticket
+      dlq-auditoria: dlq.auditoria
+    dlq-consumer:
+      enabled: ${DLQ_CONSUMER_ENABLED:true}
+  kafka:
+    topics:
+      eventos: pedidos.eventos
+      estado: pedidos.estado
+    groups:
+      notificaciones: notificaciones-group   # envía las notificaciones
+      analitica: analitica-group             # calcula métricas (recibe los mismos eventos, grupo distinto)
+      estado: estado-group                   # mantiene el último estado de cada pedido
